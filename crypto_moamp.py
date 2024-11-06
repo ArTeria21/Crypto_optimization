@@ -1,13 +1,13 @@
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from MultiobjectiveOptimization.optimizers.nsga2 import NSGA_II
+from MultiobjectiveOptimization.optimizers.moamp import MOAMP
 
 # Шаг 1: Определение тикеров криптовалют
 TICKERS = ["TON11419-USD", "SUI20947-USD",'ETH-USD', "LINK-USD", "APT21794-USD", "FET-USD", "TAO22974-USD"]
 
 # Шаг 2: Загрузка исторических данных цен
-data = yf.download(TICKERS, start="2024-09-01", end="2024-11-05", progress=False)["Adj Close"]
+data = yf.download(TICKERS, start="2024-09-01", end="2024-11-01", progress=False)["Adj Close"]
 
 # Шаг 3: Вычисление дневной доходности
 returns = data.pct_change().dropna()
@@ -57,21 +57,20 @@ def var_function(weights):
 # Список целевых функций
 objectives = [
     {'function': sharpe_ratio_function, 'minimize': False, 'name': 'Прибыль'},  # Прибыль
-    {'function': var_function, 'minimize': True, 'name': 'Риск'}     # Риск
+    {'function': var_function, 'minimize': True, 'name':'Риск'}     # Риск
 ]
 
 # Шаг 7: Инициализация оптимизатора NSGA-II
-optimizer = NSGA_II(
-    population_size=100,
-    max_generations=50,
+optimizer = MOAMP(
     variable_bounds=variable_bounds,
     objectives=objectives,
-    mutation_rate=0.5,
-    crossover_rate=0.9
+    population_size=30,
+    step_size=0.05,
+    tabu_length=5
 )
 
 # Шаг 8: Запуск оптимизации
-optimizer.run()
+optimizer.run(iterations=10)
 
 # Шаг 9: Получение и вывод Парето-фронта
 optimizer.print_pareto_front()

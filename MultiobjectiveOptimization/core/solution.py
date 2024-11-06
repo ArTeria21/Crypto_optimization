@@ -76,6 +76,6 @@ class Solution:
         str
             Строковое представление решения.
         """
-        obj_str = ', '.join([f"f{i+1}: {round(val, 4)}" for i, val in enumerate(self.objective_values)])
+        obj_str = ', '.join([f"{self.objectives[i]['name']}: {round(val, 4)}" for i, val in enumerate(self.objective_values)])
         var_str = ', '.join([f"x{i+1}: {round(val, 4)}" for i, val in enumerate(self.variables)])
         return f"Variables: [{var_str}] | Objectives: [{obj_str}]"

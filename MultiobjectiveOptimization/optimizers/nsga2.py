@@ -106,7 +106,7 @@ class NSGA_II(MultiObjectiveOptimizer):
             offspring.append(child)
         return offspring
 
-    def tournament_selection(self, k: int = 2) -> Solution:
+    def tournament_selection(self, k: int = 3) -> Solution:
         """
         Выполняет турнирный отбор.
 
@@ -257,29 +257,3 @@ class NSGA_II(MultiObjectiveOptimizer):
         pareto_front = fronts[0]
         return pareto_front
 
-    def visualize_pareto_front(self) -> None:
-        """
-        Визуализирует Парето-фронт с помощью Plotly.
-        """
-        pareto_solutions = self.get_pareto_front()
-        objective_values = np.array([solution.objective_values for solution in pareto_solutions])
-
-        df = pd.DataFrame(objective_values, columns=[f'Objective {i+1}' for i in range(self.num_objectives)])
-
-        if self.num_objectives == 2:
-            fig = px.scatter(df, x='Objective 1', y='Objective 2', title='Парето-фронт')
-        elif self.num_objectives == 3:
-            fig = px.scatter_3d(df, x='Objective 1', y='Objective 2', z='Objective 3', title='Парето-фронт')
-        else:
-            print("Визуализация доступна только для 2 или 3 целевых функций.")
-            return
-        fig.show()
-
-    def print_pareto_front(self) -> None:
-        """
-        Выводит найденный Парето-фронт.
-        """
-        pareto_solutions = self.get_pareto_front()
-        print("Найденный Парето-фронт:")
-        for solution in pareto_solutions:
-            print(solution)

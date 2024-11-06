@@ -259,17 +259,17 @@ class MOAMP(MultiObjectiveOptimizer):
             for solution in pareto_front:
                 entry = {'Iteration': i + 1}
                 for idx, val in enumerate(solution.objective_values):
-                    entry[f'Objective {idx + 1}'] = val
+                    entry[self.objectives[idx]['name']] = val
                 data.append(entry)
 
         df = pd.DataFrame(data)
 
         if self.num_objectives == 2:
-            fig = px.scatter(df, x='Objective 1', y='Objective 2', color='Iteration',
+            fig = px.scatter(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], color='Iteration',
                             title='Эволюция Парето-фронта')
         elif self.num_objectives == 3:
-            fig = px.scatter_3d(df, x='Objective 1', y='Objective 2', z='Objective 3', color='Iteration',
-                                title='Эволюция Парето-фронта')
+            fig = px.scatter_3d(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], z=self.objectives[2]['name'], 
+                                color='Iteration', title='Эволюция Парето-фронта')
         else:
             print("Визуализация доступна только для 2 или 3 целевых функций.")
             return

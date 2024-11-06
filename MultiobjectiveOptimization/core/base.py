@@ -22,13 +22,13 @@ class MultiObjectiveOptimizer(ABC):
         ----------
         variable_bounds : List[Tuple[float, float]]
             Диапазоны для каждой переменной в виде списка кортежей (min, max).
-        objectives : List[Dict[str, Any]]
-            Список словарей с функциями и индикаторами минимизации.
+        objectives : List[Dict[str, Any, str]]
+            Список словарей с функциями и индикаторами минимизации, а также названием метрики.
         population_size : int
             Размер популяции.
         """
         self.variable_bounds: List[Tuple[float, float]] = variable_bounds
-        self.objectives: List[Dict[str, Any]] = objectives
+        self.objectives: List[Dict[str, Any, str]] = objectives
         self.population_size: int = population_size
         self.num_variables: int = len(variable_bounds)
         self.num_objectives: int = len(objectives)
@@ -84,12 +84,12 @@ class MultiObjectiveOptimizer(ABC):
         pareto_solutions = self.get_pareto_front()
         objective_values = np.array([solution.objective_values for solution in pareto_solutions])
 
-        df = pd.DataFrame(objective_values, columns=[f'Objective {i+1}' for i in range(self.num_objectives)])
+        df = pd.DataFrame(objective_values, columns=[self.objectives[i]['name'] for i in range(self.num_objectives)])
 
         if self.num_objectives == 2:
-            fig = px.scatter(df, x='Objective 1', y='Objective 2', title='Парето-фронт')
+            fig = px.scatter(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], title='Парето-фронт')
         elif self.num_objectives == 3:
-            fig = px.scatter_3d(df, x='Objective 1', y='Objective 2', z='Objective 3', title='Парето-фронт')
+            fig = px.scatter_3d(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], z=self.objectives[2]['name'], title='Парето-фронт')
         else:
             print("Визуализация доступна только для 2 или 3 целевых функций.")
             return
