@@ -1,6 +1,7 @@
 beautifulsoup4==4.12.3
 certifi==2024.8.30
 charset-normalizer==3.4.0
+deap==1.4.1
 frozendict==2.4.6
 html5lib==1.1
 idna==3.10
