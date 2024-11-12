@@ -1,5 +1,3 @@
-# solution.py
-
 from typing import List, Dict, Any
 import numpy as np
 
@@ -20,10 +18,19 @@ class Solution:
         objectives : List[Dict[str, Any]]
             Список словарей с информацией о целевых функциях.
         """
-        self.variables: np.ndarray = variables  # Значения переменных
+        self.variables = variables  # Значения переменных
         self.objectives: List[Dict[str, Any]] = objectives  # Целевые функции
         self.objective_values: np.ndarray = self.evaluate_objectives()  # Значения целевых функций
-
+    
+    @property
+    def variables(self) -> np.ndarray:
+        return self.__variables
+    
+    @variables.setter
+    def variables(self, values) -> None:
+        values = [round(i / sum(values), 4) for i in values]
+        self.__variables = np.array(values)
+    
     def evaluate_objectives(self) -> np.ndarray:
         """
         Вычисляет значения всех целевых функций для текущего решения.
