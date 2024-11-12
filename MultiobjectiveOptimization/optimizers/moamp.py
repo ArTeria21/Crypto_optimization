@@ -1,5 +1,3 @@
-# moamp.py
-
 import numpy as np
 from typing import List, Tuple, Dict, Any
 from ..core.base import MultiObjectiveOptimizer
@@ -7,6 +5,26 @@ from ..core.solution import Solution
 import pandas as pd
 import plotly.express as px
 from tqdm import tqdm
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor  # Добавлено для параллельных вычислений соседей
+
+
+def tabu_search_make_step(args):
+    """
+    Вспомогательная функция для вызова make_step на экземпляре MultiobjectiveTabuSearch.
+    """
+    tabu_search, metric_index = args
+    tabu_search.make_step(metric_index)
+    return tabu_search
+
+
+def evaluate_neighbor(args):
+    """
+    Вспомогательная функция для оценки целевых функций соседа.
+    """
+    neighbor, objectives = args
+    neighbor.objective_values = neighbor.evaluate_objectives()
+    return neighbor
 
 
 class MultiobjectiveTabuSearch:
@@ -21,17 +39,6 @@ class MultiobjectiveTabuSearch:
                 tabu_length: int) -> None:
         """
         Инициализация табу-поиска.
-
-        Параметры:
-        ----------
-        variable_bounds : List[Tuple[float, float]]
-            Диапазоны для каждой переменной.
-        objectives : List[Dict[str, Any]]
-            Список целевых функций.
-        step_size : float
-            Размер шага при поиске соседей.
-        tabu_length : int
-            Максимальная длина табу-списка.
         """
         self.variable_bounds = variable_bounds
         self.objectives = objectives
@@ -44,11 +51,6 @@ class MultiobjectiveTabuSearch:
     def init_starting_point(self, solution: Solution) -> None:
         """
         Устанавливает начальное решение для табу-поиска.
-
-        Параметры:
-        ----------
-        solution : Solution
-            Начальное решение.
         """
         self.current_solution = solution
         self.best_solution = solution
@@ -56,11 +58,6 @@ class MultiobjectiveTabuSearch:
     def find_neighbors(self) -> List[Solution]:
         """
         Находит соседние решения путем изменения переменных на величину шага.
-
-        Возвращает:
-        ----------
-        List[Solution]
-            Список соседних решений.
         """
         variations = []
         for var, (lower, upper) in zip(self.current_solution.variables, self.variable_bounds):
@@ -75,16 +72,6 @@ class MultiobjectiveTabuSearch:
     def get_best_neighbor(self, metric_index: int) -> Solution:
         """
         Находит лучшего соседа по заданной целевой функции.
-
-        Параметры:
-        ----------
-        metric_index : int
-            Индекс целевой функции для оптимизации на данном шаге.
-
-        Возвращает:
-        ----------
-        Solution
-            Лучший сосед.
         """
         neighbors = self.find_neighbors()
         neighbors = [n for n in neighbors if not any(np.array_equal(n.variables, t) for t in self.tabu_list)]
@@ -92,9 +79,17 @@ class MultiobjectiveTabuSearch:
         if not neighbors:
             return self.current_solution
 
+        # Параллельная оценка целевых функций соседей
+        with ThreadPoolExecutor() as executor:
+            neighbors = list(executor.map(
+                evaluate_neighbor,
+                [(neighbor, self.objectives) for neighbor in neighbors]
+            ))
+
         obj = self.objectives[metric_index]
         minimize = obj['minimize']
 
+        # Сортировка соседей по значению целевой функции
         neighbors.sort(key=lambda x: x.objective_values[metric_index], reverse=not minimize)
         best_neighbor = neighbors[0]
         return best_neighbor
@@ -102,16 +97,6 @@ class MultiobjectiveTabuSearch:
     def make_step(self, metric_index: int) -> Solution:
         """
         Выполняет шаг табу-поиска.
-
-        Параметры:
-        ----------
-        metric_index : int
-            Индекс целевой функции для оптимизации на данном шаге.
-
-        Возвращает:
-        ----------
-        Solution
-            Новое текущее решение.
         """
         self.tabu_list.append(self.current_solution.variables)
         if len(self.tabu_list) > self.tabu_length:
@@ -140,19 +125,6 @@ class MOAMP(MultiObjectiveOptimizer):
                 tabu_length: int = 10) -> None:
         """
         Инициализация MOAMP.
-
-        Параметры:
-        ----------
-        variable_bounds : List[Tuple[float, float]]
-            Диапазоны для каждой переменной.
-        objectives : List[Dict[str, Any]]
-            Список целевых функций.
-        population_size : int
-            Размер популяции.
-        step_size : float
-            Размер шага при поиске соседей.
-        tabu_length : int
-            Максимальная длина табу-списка.
         """
         super().__init__(variable_bounds, objectives, population_size)
         self.step_size = step_size
@@ -193,11 +165,6 @@ class MOAMP(MultiObjectiveOptimizer):
     def run(self, iterations: int) -> None:
         """
         Запускает алгоритм MOAMP.
-
-        Параметры:
-        ----------
-        iterations : int
-            Количество итераций оптимизации.
         """
         self.initialize_population()
 
@@ -213,14 +180,13 @@ class MOAMP(MultiObjectiveOptimizer):
     def make_step(self, metric_index: int) -> None:
         """
         Выполняет шаг оптимизации для всей популяции по заданной метрике.
-
-        Параметры:
-        ----------
-        metric_index : int
-            Индекс целевой функции для оптимизации на данном шаге.
         """
-        for tabu_search in self.tabu_searches:
-            tabu_search.make_step(metric_index)
+        # Параллельное выполнение табу-поисков
+        with multiprocessing.Pool() as pool:
+            self.tabu_searches = pool.map(
+                tabu_search_make_step,
+                [(tabu_search, metric_index) for tabu_search in self.tabu_searches]
+            )
         self.population = [tabu_search.current_solution for tabu_search in self.tabu_searches]
 
     def update_pareto_front(self) -> None:
@@ -242,11 +208,6 @@ class MOAMP(MultiObjectiveOptimizer):
     def get_pareto_front(self) -> List[Solution]:
         """
         Возвращает текущий Парето-фронт.
-
-        Возвращает:
-        ----------
-        List[Solution]
-            Список решений на Парето-фронте.
         """
         return self.pareto_front
 
@@ -268,7 +229,7 @@ class MOAMP(MultiObjectiveOptimizer):
             fig = px.scatter(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], color='Iteration',
                             title='Эволюция Парето-фронта')
         elif self.num_objectives == 3:
-            fig = px.scatter_3d(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], z=self.objectives[2]['name'], 
+            fig = px.scatter_3d(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], z=self.objectives[2]['name'],
                                 color='Iteration', title='Эволюция Парето-фронта')
         else:
             print("Визуализация доступна только для 2 или 3 целевых функций.")
