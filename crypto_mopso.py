@@ -62,8 +62,8 @@ objectives = [
 
 # Шаг 7: Инициализация оптимизатора NSGA-II
 optimizer = MOPSO(
-    population_size=500,
-    max_iterations=3000,
+    population_size=50,
+    max_iterations=30,
     variable_bounds=variable_bounds,
     objectives=objectives,
     inertia_weight=0.9,
