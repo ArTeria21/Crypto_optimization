@@ -14,7 +14,8 @@ class MultiObjectiveOptimizer(ABC):
     def __init__(self,
                 variable_bounds: List[Tuple[float, float]],
                 objectives: List[Dict[str, Any]],
-                population_size: int) -> None:
+                population_size: int,
+                normalize_values: bool = False) -> None:
         """
         Инициализация оптимизатора.
 
@@ -34,6 +35,7 @@ class MultiObjectiveOptimizer(ABC):
         self.num_objectives: int = len(objectives)
         self.population: List[Solution] = []
         self.pareto_front: List[Solution] = []
+        self.normalize_values = normalize_values
 
     @abstractmethod
     def initialize_population(self) -> None:

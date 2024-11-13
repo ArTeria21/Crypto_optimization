@@ -12,12 +12,13 @@ class NSGA_II(MultiObjectiveOptimizer):
     """
 
     def __init__(self,
-                population_size: int,
-                max_generations: int,
-                variable_bounds: List[Tuple[float, float]],
-                objectives: List[Dict[str, Any]],
-                mutation_rate: float = 0.1,
-                crossover_rate: float = 0.9) -> None:
+                 population_size: int,
+                 max_generations: int,
+                 variable_bounds: List[Tuple[float, float]],
+                 objectives: List[Dict[str, Any]],
+                 mutation_rate: float = 0.1,
+                 crossover_rate: float = 0.9,
+                 normalize_values: bool = False) -> None:
         """
         Инициализация алгоритма NSGA-II.
 
@@ -35,11 +36,14 @@ class NSGA_II(MultiObjectiveOptimizer):
             Вероятность мутации.
         crossover_rate : float
             Вероятность кроссовера.
+        normalize_values : bool
+            Флаг для нормализации переменных.
         """
         super().__init__(variable_bounds, objectives, population_size)
         self.max_generations: int = max_generations
         self.mutation_rate: float = mutation_rate
         self.crossover_rate: float = crossover_rate
+        self.normalize_values: bool = normalize_values  # Добавлено
         self.population: List[Solution] = []
 
     def initialize_population(self) -> None:
@@ -50,7 +54,7 @@ class NSGA_II(MultiObjectiveOptimizer):
         upper_bounds = np.array([b[1] for b in self.variable_bounds])
         for _ in range(self.population_size):
             variables = np.random.uniform(lower_bounds, upper_bounds)
-            solution = Solution(variables=variables, objectives=self.objectives)
+            solution = Solution(variables=variables, objectives=self.objectives, normalize_values=self.normalize_values)
             self.population.append(solution)
 
     def evaluate_population(self) -> None:
@@ -71,6 +75,7 @@ class NSGA_II(MultiObjectiveOptimizer):
             print(f"Поколение {generation + 1}/{self.max_generations}")
 
             offspring = self.create_offspring()
+            self.evaluate_offspring(offspring)
             combined_population = self.population + offspring
             fronts = self.fast_non_dominated_sort(combined_population)
             new_population = []
@@ -83,7 +88,6 @@ class NSGA_II(MultiObjectiveOptimizer):
                     break
 
             self.population = new_population[:self.population_size]
-            self.evaluate_population()
 
         print("Алгоритм NSGA-II завершил работу.")
 
@@ -102,9 +106,21 @@ class NSGA_II(MultiObjectiveOptimizer):
             parent2 = self.tournament_selection()
             child_variables = self.crossover(parent1.variables, parent2.variables)
             child_variables = self.mutate(child_variables)
-            child = Solution(variables=child_variables, objectives=self.objectives)
+            child = Solution(variables=child_variables, objectives=self.objectives, normalize_values=self.normalize_values)
             offspring.append(child)
         return offspring
+
+    def evaluate_offspring(self, offspring: List[Solution]) -> None:
+        """
+        Оценивает потомков по целевым функциям.
+
+        Параметры:
+        ----------
+        offspring : List[Solution]
+            Список потомков для оценки.
+        """
+        for child in offspring:
+            child.objective_values = child.evaluate_objectives()
 
     def tournament_selection(self, k: int = 3) -> Solution:
         """
@@ -124,6 +140,8 @@ class NSGA_II(MultiObjectiveOptimizer):
         best = participants[0]
         for participant in participants[1:]:
             if participant.dominates(best):
+                best = participant
+            elif not best.dominates(participant) and np.random.rand() < 0.5:
                 best = participant
         return best
 
@@ -257,3 +275,34 @@ class NSGA_II(MultiObjectiveOptimizer):
         pareto_front = fronts[0]
         return pareto_front
 
+    def print_pareto_front(self) -> None:
+        """
+        Выводит текущий Парето-фронт.
+        """
+        pareto_front = self.get_pareto_front()
+        print("Текущий Парето-фронт:")
+        for solution in pareto_front:
+            print(solution)
+
+    def visualize_pareto_front(self) -> None:
+        """
+        Визуализирует Парето-фронт с помощью Plotly.
+        """
+        pareto_front = self.get_pareto_front()
+        if not pareto_front:
+            print("Парето-фронт пуст.")
+            return
+
+        objective_values = np.array([solution.objective_values for solution in pareto_front])
+
+        df = pd.DataFrame(objective_values, columns=[self.objectives[i]['name'] for i in range(self.num_objectives)])
+
+        if self.num_objectives == 2:
+            fig = px.scatter(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'], title='Парето-фронт')
+        elif self.num_objectives == 3:
+            fig = px.scatter_3d(df, x=self.objectives[0]['name'], y=self.objectives[1]['name'],
+                                z=self.objectives[2]['name'], title='Парето-фронт')
+        else:
+            print("Визуализация доступна только для 2 или 3 целевых функций.")
+            return
+        fig.show()

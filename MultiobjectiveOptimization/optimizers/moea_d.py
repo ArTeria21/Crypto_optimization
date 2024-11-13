@@ -1,5 +1,3 @@
-# moea_d.py
-
 import numpy as np
 from typing import List, Tuple, Dict, Any
 from ..core.base import MultiObjectiveOptimizer
@@ -15,15 +13,16 @@ class MOEA_D(MultiObjectiveOptimizer):
     """
 
     def __init__(self,
-                 population_size: int,
-                 max_generations: int,
-                 variable_bounds: List[Tuple[float, float]],
-                 objectives: List[Dict[str, Any]],
-                 neighborhood_size: int = None,
-                 nr: int = 2,
-                 delta: float = 0.9,
-                 mutation_rate: float = 0.1,
-                 crossover_rate: float = 0.9) -> None:
+                population_size: int,
+                max_generations: int,
+                variable_bounds: List[Tuple[float, float]],
+                objectives: List[Dict[str, Any]],
+                neighborhood_size: int = None,
+                nr: int = 2,
+                delta: float = 0.9,
+                mutation_rate: float = 0.1,
+                crossover_rate: float = 0.9,
+                normalize_values: bool = False) -> None:
         """
         Инициализация алгоритма MOEA/D.
         """
@@ -40,6 +39,7 @@ class MOEA_D(MultiObjectiveOptimizer):
         self.neighbors: List[List[int]] = []
         self.z: np.ndarray = None  # Справочная точка (идеальная точка)
         self.archive: List[Solution] = []  # Архив недоминируемых решений
+        self.normalize_values = normalize_values  # Добавлено
 
     def initialize_population(self) -> None:
         """
@@ -50,7 +50,7 @@ class MOEA_D(MultiObjectiveOptimizer):
         upper_bounds = np.array([b[1] for b in self.variable_bounds])
         for _ in range(self.population_size):
             variables = np.random.uniform(lower_bounds, upper_bounds)
-            solution = Solution(variables=variables, objectives=self.objectives)
+            solution = Solution(variables=variables, objectives=self.objectives, normalize_values=self.normalize_values)
             solution.objective_values = solution.evaluate_objectives()
             self.population.append(solution)
 
@@ -149,7 +149,7 @@ class MOEA_D(MultiObjectiveOptimizer):
                 # Шаг 2: Генерация потомка
                 child_variables = self.sbx_crossover(parent1.variables, parent2.variables)
                 child_variables = self.polynomial_mutation(child_variables)
-                child = Solution(variables=child_variables, objectives=self.objectives)
+                child = Solution(variables=child_variables, objectives=self.objectives, normalize_values=self.normalize_values)
                 child.objective_values = child.evaluate_objectives()
 
                 # Шаг 3: Обновление справочной точки
@@ -243,7 +243,7 @@ class MOEA_D(MultiObjectiveOptimizer):
             f_current = self.tchebycheff(current_solution, weight_vector)
             f_child = self.tchebycheff(child, weight_vector)
             if f_child < f_current:
-                self.population[neighbor_index] = Solution(child.variables.copy(), self.objectives)
+                self.population[neighbor_index] = Solution(child.variables.copy(), self.objectives, normalize_values=self.normalize_values)
                 self.population[neighbor_index].objective_values = child.objective_values.copy()
 
     def update_archive(self, solution: Solution) -> None:

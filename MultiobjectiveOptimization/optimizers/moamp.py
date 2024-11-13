@@ -36,10 +36,12 @@ class MultiobjectiveTabuSearch:
                 variable_bounds: List[Tuple[float, float]],
                 objectives: List[Dict[str, Any]],
                 step_size: float,
-                tabu_length: int) -> None:
+                tabu_length: int,
+                normalize_values: bool = False) -> None:
         """
         Инициализация табу-поиска.
         """
+        self.normalize_values: bool = normalize_values
         self.variable_bounds = variable_bounds
         self.objectives = objectives
         self.step_size = step_size
@@ -57,16 +59,20 @@ class MultiobjectiveTabuSearch:
 
     def find_neighbors(self) -> List[Solution]:
         """
-        Находит соседние решения путем изменения переменных на величину шага.
+        Находит соседние решения путем изменения одной переменной за раз.
         """
-        variations = []
-        for var, (lower, upper) in zip(self.current_solution.variables, self.variable_bounds):
-            steps = [var - self.step_size, var, var + self.step_size]
-            steps = [s for s in steps if lower <= s <= upper]
-            variations.append(steps)
-
-        neighbor_vars = np.array(np.meshgrid(*variations)).T.reshape(-1, len(self.variable_bounds))
-        neighbors = [Solution(variables=vars, objectives=self.objectives) for vars in neighbor_vars]
+        neighbors = []
+        for idx, (var, (lower, upper)) in enumerate(zip(self.current_solution.variables, self.variable_bounds)):
+            # Уменьшаем переменную
+            if var - self.step_size >= lower:
+                new_variables = np.copy(self.current_solution.variables)
+                new_variables[idx] -= self.step_size
+                neighbors.append(Solution(variables=new_variables, objectives=self.objectives, normalize_values=self.normalize_values))
+            # Увеличиваем переменную
+            if var + self.step_size <= upper:
+                new_variables = np.copy(self.current_solution.variables)
+                new_variables[idx] += self.step_size
+                neighbors.append(Solution(variables=new_variables, objectives=self.objectives, normalize_values=self.normalize_values))
         return neighbors
 
     def get_best_neighbor(self, metric_index: int) -> Solution:
@@ -112,6 +118,7 @@ class MultiobjectiveTabuSearch:
         return self.current_solution
 
 
+
 class MOAMP(MultiObjectiveOptimizer):
     """
     Класс, реализующий алгоритм MOAMP для многокритериальной оптимизации.
@@ -122,7 +129,8 @@ class MOAMP(MultiObjectiveOptimizer):
                 objectives: List[Dict[str, Any]],
                 population_size: int = 30,
                 step_size: float = 1.0,
-                tabu_length: int = 10) -> None:
+                tabu_length: int = 10,
+                normalize_values: bool = False) -> None:
         """
         Инициализация MOAMP.
         """
@@ -131,6 +139,7 @@ class MOAMP(MultiObjectiveOptimizer):
         self.tabu_length = tabu_length
         self.tabu_searches: List[MultiobjectiveTabuSearch] = []
         self.history: List[List[Solution]] = []
+        self.normalize_values = normalize_values
 
     def initialize_population(self) -> None:
         """
@@ -141,14 +150,15 @@ class MOAMP(MultiObjectiveOptimizer):
 
         for _ in range(self.population_size):
             variables = np.random.uniform(lower_bounds, upper_bounds)
-            solution = Solution(variables=variables, objectives=self.objectives)
+            solution = Solution(variables=variables, objectives=self.objectives, normalize_values=self.normalize_values)
             self.population.append(solution)
 
             tabu_search = MultiobjectiveTabuSearch(
                 variable_bounds=self.variable_bounds,
                 objectives=self.objectives,
                 step_size=self.step_size,
-                tabu_length=self.tabu_length
+                tabu_length=self.tabu_length,
+                normalize_values=self.normalize_values  # Добавлено
             )
             tabu_search.init_starting_point(solution)
             self.tabu_searches.append(tabu_search)

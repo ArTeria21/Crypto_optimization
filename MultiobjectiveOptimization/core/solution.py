@@ -7,7 +7,7 @@ class Solution:
     Класс, представляющий решение в пространстве переменных.
     """
 
-    def __init__(self, variables: np.ndarray, objectives: List[Dict[str, Any]]) -> None:
+    def __init__(self, variables: np.ndarray, objectives: List[Dict[str, Any]], normalize_values: bool = False) -> None:
         """
         Инициализация решения.
 
@@ -18,6 +18,7 @@ class Solution:
         objectives : List[Dict[str, Any]]
             Список словарей с информацией о целевых функциях.
         """
+        self.normalize_values: bool = normalize_values
         self.variables = variables  # Значения переменных
         self.objectives: List[Dict[str, Any]] = objectives  # Целевые функции
         self.objective_values: np.ndarray = self.evaluate_objectives()  # Значения целевых функций
@@ -28,8 +29,11 @@ class Solution:
     
     @variables.setter
     def variables(self, values) -> None:
-        values = [round(i / sum(values), 4) for i in values]
-        self.__variables = np.array(values)
+        if self.normalize_values:
+            values = [round(i / sum(values), 4) for i in values]
+            self.__variables = np.array(values)
+        else:
+            self.__variables = np.array(values)
     
     def evaluate_objectives(self) -> np.ndarray:
         """

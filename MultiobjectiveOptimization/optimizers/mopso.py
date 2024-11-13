@@ -13,35 +13,17 @@ class MOPSO(MultiObjectiveOptimizer):
     """
 
     def __init__(self,
-                population_size: int,
-                max_iterations: int,
-                variable_bounds: List[Tuple[float, float]],
-                objectives: List[Dict[str, Any]],
-                inertia_weight: float = 0.729,  # Вес инерции
-                cognitive_constant: float = 1.49445,  # Когнитивная компонента
-                social_constant: float = 1.49445,     # Социальная компонента
-                repository_size: int = 100) -> None:
+                 population_size: int,
+                 max_iterations: int,
+                 variable_bounds: List[Tuple[float, float]],
+                 objectives: List[Dict[str, Any]],
+                 inertia_weight: float = 0.729,  # Вес инерции
+                 cognitive_constant: float = 1.49445,  # Когнитивная компонента
+                 social_constant: float = 1.49445,     # Социальная компонента
+                 repository_size: int = 100,
+                 normalize_values: bool = False) -> None:
         """
         Инициализация алгоритма MOPSO.
-
-        Параметры:
-        ----------
-        population_size : int
-            Размер роя (популяции).
-        max_iterations : int
-            Максимальное количество итераций.
-        variable_bounds : List[Tuple[float, float]]
-            Диапазоны для каждой переменной.
-        objectives : List[Dict[str, Any]]
-            Список целевых функций.
-        inertia_weight : float
-            Коэффициент инерции.
-        cognitive_constant : float
-            Коэффициент когнитивной компоненты.
-        social_constant : float
-            Коэффициент социальной компоненты.
-        repository_size : int
-            Максимальный размер репозитория (архива) решений.
         """
         super().__init__(variable_bounds, objectives, population_size)
         self.max_iterations = max_iterations
@@ -49,6 +31,7 @@ class MOPSO(MultiObjectiveOptimizer):
         self.cognitive_constant = cognitive_constant
         self.social_constant = social_constant
         self.repository_size = repository_size
+        self.normalize_values = normalize_values  # Добавлено
         self.velocities: List[np.ndarray] = []
         self.personal_best_positions: List[np.ndarray] = []
         self.personal_best_values: List[np.ndarray] = []
@@ -65,7 +48,8 @@ class MOPSO(MultiObjectiveOptimizer):
         for _ in range(self.population_size):
             variables = np.random.uniform(lower_bounds, upper_bounds)
             velocity = np.zeros(dimension)
-            solution = Solution(variables=variables, objectives=self.objectives)
+            solution = Solution(variables=variables, objectives=self.objectives, normalize_values=self.normalize_values)
+            solution.objective_values = solution.evaluate_objectives()
             self.population.append(solution)
             self.velocities.append(velocity)
             self.personal_best_positions.append(variables.copy())
@@ -86,44 +70,17 @@ class MOPSO(MultiObjectiveOptimizer):
         Обновляет личные лучшие позиции частиц.
         """
         for i, particle in enumerate(self.population):
-            current_values = particle.objective_values
-            personal_best_values = self.personal_best_values[i]
-            if self.dominates(current_values, personal_best_values):
-                self.personal_best_positions[i] = particle.variables.copy()
-                self.personal_best_values[i] = current_values.copy()
+            current_solution = particle
+            personal_best_solution = Solution(
+                variables=self.personal_best_positions[i],
+                objectives=self.objectives,
+                normalize_values=self.normalize_values
+            )
+            personal_best_solution.objective_values = self.personal_best_values[i]
 
-    def dominates(self, values1: np.ndarray, values2: np.ndarray) -> bool:
-        """
-        Проверяет, доминирует ли первое решение над вторым.
-
-        Параметры:
-        ----------
-        values1 : np.ndarray
-            Значения целевых функций первого решения.
-        values2 : np.ndarray
-            Значения целевых функций второго решения.
-
-        Возвращает:
-        ----------
-        bool
-            True, если первое решение доминирует над вторым, иначе False.
-        """
-        better_in_all = True
-        better_in_at_least_one = False
-
-        for val1, val2, obj in zip(values1, values2, self.objectives):
-            if obj['minimize']:
-                if val1 > val2:
-                    better_in_all = False
-                elif val1 < val2:
-                    better_in_at_least_one = True
-            else:
-                if val1 < val2:
-                    better_in_all = False
-                elif val1 > val2:
-                    better_in_at_least_one = True
-
-        return better_in_all and better_in_at_least_one
+            if current_solution.dominates(personal_best_solution):
+                self.personal_best_positions[i] = current_solution.variables.copy()
+                self.personal_best_values[i] = current_solution.objective_values.copy()
 
     def update_repository(self) -> None:
         """
@@ -149,18 +106,6 @@ class MOPSO(MultiObjectiveOptimizer):
     def crowding_distance_selection(self, solutions: List[Solution], size: int) -> List[Solution]:
         """
         Отбирает решения по расстоянию сжатия для сохранения разнообразия.
-
-        Параметры:
-        ----------
-        solutions : List[Solution]
-            Список решений для отбора.
-        size : int
-            Требуемый размер выборки.
-
-        Возвращает:
-        ----------
-        List[Solution]
-            Отобранные решения.
         """
         # Вычисляем расстояния сжатия
         self.calculate_crowding_distance(solutions)
@@ -171,11 +116,6 @@ class MOPSO(MultiObjectiveOptimizer):
     def calculate_crowding_distance(self, solutions: List[Solution]) -> None:
         """
         Вычисляет расстояния сжатия для заданного списка решений.
-
-        Параметры:
-        ----------
-        solutions : List[Solution]
-            Список решений для вычисления расстояний.
         """
         num_solutions = len(solutions)
         for solution in solutions:
@@ -197,11 +137,6 @@ class MOPSO(MultiObjectiveOptimizer):
     def select_global_best(self) -> np.ndarray:
         """
         Выбирает глобально лучшее решение из репозитория.
-
-        Возвращает:
-        ----------
-        np.ndarray
-            Переменные глобально лучшего решения.
         """
         return random.choice(self.repository).variables.copy()
 
@@ -231,16 +166,18 @@ class MOPSO(MultiObjectiveOptimizer):
                     social_velocity
                 )
                 # Обновление позиции
-                self.population[i].variables += self.velocities[i]
+                new_variables = self.population[i].variables + self.velocities[i]
                 # Проверка границ
                 for d in range(self.num_variables):
                     lower, upper = self.variable_bounds[d]
-                    if self.population[i].variables[d] < lower:
-                        self.population[i].variables[d] = lower
+                    if new_variables[d] < lower:
+                        new_variables[d] = lower
                         self.velocities[i][d] = 0
-                    elif self.population[i].variables[d] > upper:
-                        self.population[i].variables[d] = upper
+                    elif new_variables[d] > upper:
+                        new_variables[d] = upper
                         self.velocities[i][d] = 0
+                # Присваиваем новые переменные с учетом нормализации
+                self.population[i].variables = new_variables
 
             self.evaluate_population()
 
@@ -249,11 +186,6 @@ class MOPSO(MultiObjectiveOptimizer):
     def get_pareto_front(self) -> List[Solution]:
         """
         Возвращает найденный Парето-фронт из репозитория.
-
-        Возвращает:
-        ----------
-        List[Solution]
-            Список решений на Парето-фронте.
         """
         return self.repository
 
@@ -262,6 +194,10 @@ class MOPSO(MultiObjectiveOptimizer):
         Визуализирует Парето-фронт с помощью Plotly.
         """
         pareto_solutions = self.get_pareto_front()
+        if not pareto_solutions:
+            print("Парето-фронт пуст.")
+            return
+
         objective_values = np.array([solution.objective_values for solution in pareto_solutions])
 
         df = pd.DataFrame(objective_values, columns=[self.objectives[i]['name'] for i in range(self.num_objectives)])
