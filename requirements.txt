@@ -17,6 +17,8 @@ frozendict==2.4.6
 grapheme==0.6.0
 html5lib==1.1
 idna==3.10
+ipykernel==6.29.5
+ipython==8.31.0
 joblib==1.4.2
 jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
@@ -50,4 +52,4 @@ urllib3==2.2.3
 webencodings==0.5.1
 wheel==0.44.0
 wrapt==1.17.0
-yfinance==0.2.48
+yfinance==0.2.54
